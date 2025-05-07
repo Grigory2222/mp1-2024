@@ -1,0 +1,414 @@
+#include <iostream>
+#include <vector>
+#include <iomanip>
+#include <stdexcept>
+#include <algorithm>
+#include <string>
+#include <sstream>
+#include <regex>
+
+using namespace std;
+class Observation {
+public:
+    int day;
+    int month;
+    int year;
+    int hour;
+    float temperature;
+
+    Observation(int d, int m, int y, int h, float temp)
+        : day(d), month(m), year(y), hour(h), temperature(temp) {
+    }
+};
+
+class Thermometer {
+private:
+    vector<Observation> observations; // хранение наблюдения
+    int start_day, start_month, start_year;
+
+public:
+    void setStartDate(int day, int month, int year) {
+        start_day = day;
+        start_month = month;
+        start_year = year;
+    }
+
+    void getStartDate() const {
+        cout << "Начальная дата: " << start_day << "-" << start_month << "-" << start_year << endl;
+    }
+
+    void addObservation(int day, int month, int year, int hour, float temperature) {
+        for (auto& obs : observations) {
+            if (obs.day == day && obs.month == month && obs.year == year && obs.hour == hour) {
+                obs.temperature = temperature; // Обновление существующего наблюдения
+                return;
+            }
+        }
+        // Если наблюдение новое, добавляем его
+        observations.emplace_back(day, month, year, hour, temperature);
+    }
+
+    float getTemperature(int day, int month, int year, int hour) const {
+        for (const auto& obs : observations) {
+            if (obs.day == day && obs.month == month && obs.year == year && obs.hour == hour) {
+                return obs.temperature;
+            }
+        }
+        throw runtime_error("Наблюдение не найдено.");
+    }
+
+    void addSeriesObservations(int day, int month, int year, const vector<float>& temperatures) {
+        for (int hour = 0; hour < temperatures.size(); ++hour) {
+            addObservation(day, month, year, static_cast<int>(hour), temperatures[hour]);
+        }
+    }
+
+    double averageTemperatureByDate(int day, int month, int year) const {
+        double totalTemp = 0;
+        int count = 0;
+        for (const auto& obs : observations) {
+            if (obs.day == day && obs.month == month && obs.year == year) {
+                totalTemp += obs.temperature;
+                count++;
+            }
+        }
+        return count > 0 ? (totalTemp / count) : -1; // Если нет наблюдений, вернуть -1
+    }
+
+    double averageTemperatureForMonth(int month, int year) const {
+        double totalTemp = 0;
+        int count = 0;
+        for (const auto& obs : observations) {
+            if (obs.month == month && obs.year == year) {
+                totalTemp += obs.temperature;
+                count++;
+            }
+        }
+        return count > 0 ? (totalTemp / count) : -1; // Если нет наблюдений, вернуть -1
+    }
+
+    double averageDaytimeTemperature(int month, int year) const {
+        double totalTemp = 0;
+        int count = 0;
+        for (const auto& obs : observations) {
+            if (obs.month == month && obs.year == year && obs.hour >= 6 && obs.hour < 18) {
+                totalTemp += obs.temperature;
+                count++;
+            }
+        }
+        return count > 0 ? (totalTemp / count) : -1; // Если нет наблюдений, вернуть -1
+    }
+
+    double averageNighttimeTemperature(int month, int year) const {
+        double totalTemp = 0;
+        int count = 0;
+        for (const auto& obs : observations) {
+            if (obs.month == month && obs.year == year && (obs.hour < 6 || obs.hour >= 18)) {
+                totalTemp += obs.temperature;
+                count++;
+            }
+        }
+        return count > 0 ? (totalTemp / count) : -1; // Если нет наблюдений, вернуть -1
+    }
+
+    void displayObservations() const {
+        for (const auto& obs : observations) {
+            std::cout << std::setw(2) << std::setfill('0') << obs.day << "-"
+                << std::setw(2) << std::setfill('0') << obs.month << "-"
+                << obs.year << " " << std::setw(2) << std::setfill('0') << obs.hour << ":00"
+                << " -> " << obs.temperature << " °C\n";
+        }
+    }
+};
+
+// add 12.04.2025 13:00 14g
+// average 12.04.2025
+// add 12.04.2025 13:00 14g 20:00 10g 
+
+int main() {
+
+    regex day_regex(R"((\d{2})/)");
+    regex mounth_regex(R"(/(\d{2})/)");
+    regex year_regex(R"(/(\d{4}))");
+    regex hour_regex(R"( d{2} )");
+
+    regex temperature_regex(R"(-?\d+\.\?\d*\s*°?[CF]?)");
+
+    setlocale(LC_ALL, "Russian");
+
+    Thermometer thermometer;
+    int choice, day, month, year, hour;
+    float temperature;
+    string e2;
+    string e1;
+    while (e2 != "vuhod") {
+        cout << "Ведите одну из команд:  series, vuvesty, vuhod" << endl;
+        getline(cin, e2);
+
+        /*if (e2[1] = 'u') {
+            break;
+        }*/
+        if (e2 == "")
+            getline(cin, e2);
+        if(e2[0] == 's'){
+            smatch matches;
+            cout << "Введите день, месяц, год: " << endl;
+            getline(cin, e1);
+            /*if (e1 == "")
+                getline(cin, e1);*/
+            if (regex_search(e1, matches, day_regex)) {
+                string days = matches[1];
+                day = stoi(days);
+            }
+
+
+            if (regex_search(e1, matches, mounth_regex)) {
+                string months = matches[1];
+                month = stoi(months);
+            }
+
+            if (regex_search(e1, matches, year_regex)) {
+                string years = matches[1];
+                year = stoi(years);
+
+            }
+            int count;
+            cout << "Количество температур: ";
+            cin >> count;
+            vector<float> temperatures(count);
+            cout << "Введите температуры: ";
+            for (int i = 0; i < count; ++i) {
+                cin >> temperatures[i];
+            }
+            thermometer.addSeriesObservations(day, month, year, temperatures);
+            
+        }
+        else if (e2[2] == 'v') {
+            cout << "Все наблюдения:\n";
+            thermometer.displayObservations();
+            
+        }
+
+
+    }
+}
+    
+    
+    /*while (true) {
+        cout << "\n1. Установить начальную дату\n";
+        cout << "2. Узнать начальную дату\n";
+        cout << "3. Добавить наблюдение\n";
+        cout << "4. Узнать температуру по дате и времени\n";
+        cout << "5. Добавить серию наблюдений для выбранной даты\n";
+        cout << "6. Найти среднюю температуру за день\n";
+        cout << "7. Найти среднюю температуру за месяц\n";
+        cout << "8. Найти среднюю дневную температуру за месяц\n";
+        cout << "9. Найти среднюю ночную температуру за месяц\n";
+        cout << "10. Показать все наблюдения\n";
+        cout << "11. Выход\n";
+        cout << "Выберите действие: ";
+        cin >> choice;
+        smatch matches;
+        try {
+            switch (choice) {
+            case 1:
+                cout << "Введите день, месяц, год: ";
+
+                getline(cin, e1);
+                if (e1 == "")
+                    getline(cin, e1);
+                
+                
+           
+                if (regex_search(e1, matches, day_regex)) {
+                    string days = matches[0];
+                    day = stoi(days);
+                }
+
+
+                if (regex_search(e1, matches, day_regex)) {
+                    string months = matches[0];
+                    month = stoi(months);
+                }
+
+                if (regex_search(e1, matches, day_regex)) {
+                    string years = matches[0];
+                    year = stoi(years);
+
+                }
+
+
+            
+                
+                thermometer.setStartDate(day, month, year);
+                break;
+
+
+            case 2:
+                thermometer.getStartDate();
+                break;
+
+            case 3:
+                cout << "Введите день, месяц, год, час и температуру: ";
+                cin.ignore();
+                getline(cin, e1);
+                
+                if (regex_search(e1, matches, day_regex)) {
+                    string days = matches[0];
+                    day = stoi(days);
+                }
+
+           
+                if (regex_search(e1, matches, day_regex)) {
+                    string months = matches[0];
+                    month = stoi(months);
+                }
+
+                if (regex_search(e1, matches, day_regex)) {
+                    string years = matches[0];
+                    year = stoi(years);
+                    
+                }
+
+
+                if (regex_search(e1, matches, day_regex)) {
+                    string hours = matches[0];
+                    hour = stoi(hours);
+                   
+                }
+
+                if (regex_search(e1, matches, day_regex)) {
+                    string temperatures = matches[0];
+                    temperature = stof(temperatures);
+                }
+                
+                cout << day << month << year << hour << temperature;
+                thermometer.addObservation(day, month, year, hour, temperature);
+                break;
+
+            case 4:
+                cout << "Введите день, месяц, год, час: ";
+
+                getline(cin, e1);
+                //        e1 = "12  4 2025";
+
+                if (regex_search(e1, matches, day_regex)) {
+                    string days = matches[0];
+                    day = stoi(days);
+                }
+
+
+                if (regex_search(e1, matches, day_regex)) {
+                    string months = matches[0];
+                    month = stoi(months);
+                }
+
+                if (regex_search(e1, matches, day_regex)) {
+                    string years = matches[0];
+                    year = stoi(years);
+
+                }
+
+
+                if (regex_search(e1, matches, day_regex)) {
+                    string hours = matches[0];
+                    hour = stoi(hours);
+
+                }
+
+             
+                
+                
+                cout << "Температура: " << thermometer.getTemperature(day, month, year, hour) << " °C\n";
+                break;
+
+            case 5: {
+
+
+                cout << "Введите день, месяц, год: ";
+                getline(cin, e1);
+                if (e1 == "")
+                    getline(cin, e1);
+                if (regex_search(e1, matches, day_regex)) {
+                    string days = matches[1];
+                    day = stoi(days);
+                }
+
+
+                if (regex_search(e1, matches, mounth_regex)) {
+                    string months = matches[1];
+                    month = stoi(months);
+                }
+
+                if (regex_search(e1, matches, year_regex)) {
+                    string years = matches[1];
+                    year = stoi(years);
+
+                }
+
+
+                
+                
+                int count;
+                cout << "Количество температур: ";
+                cin >> count;
+                vector<float> temperatures(count);
+                cout << "Введите температуры: ";
+                for (int i = 0; i < count; ++i) {
+                    cin >> temperatures[i];
+                }
+                thermometer.addSeriesObservations(day, month, year, temperatures);
+                break;
+            }
+
+            case 6:
+                cout << "Введите день, месяц, год: ";
+                cin >> day >> month >> year;
+                cout << "Средняя температура за "
+                    << day << "-" << month << "-" << year << ": "
+                    << thermometer.averageTemperatureByDate(day, month, year) << " °C\n";
+                break;
+
+            case 7:
+                cout << "Введите месяц и год: ";
+                cin >> month >> year;
+                cout << "Средняя температура за "
+                    << month << "-" << year << ": "
+                    << thermometer.averageTemperatureForMonth(month, year) << " °C\n";
+                break;
+
+            case 8:
+                cout << "Введите месяц и год: ";
+                cin >> month >> year;
+                cout << "Средняя дневная температура за " << month << "-" << year << ": "
+                    << thermometer.averageDaytimeTemperature(month, year) << " °C\n";
+                break;
+
+            case 9:
+                cout << "Введите месяц и год: ";
+                cin >> month >> year;
+                cout << "Средняя ночная температура за "
+                    << month << "-" << year << ": "
+                    << thermometer.averageNighttimeTemperature(month, year) << " °C\n";
+                break;
+
+            case 10:
+                cout << "Все наблюдения:\n";
+                thermometer.displayObservations();
+                break;
+
+            case 11:
+                cout << "Выход.\n";
+                return 0;
+
+            default:
+                cout << "Недопустимый выбор.\n";
+            }
+        }
+        catch (const exception& e) {
+            cout << "Ошибка: " << e.what() << std::endl;
+        }
+    }
+
+    return 0;
+}*/
