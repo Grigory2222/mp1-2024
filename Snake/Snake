@@ -1,0 +1,348 @@
+#include <iostream>
+#include <vector>
+#include <conio.h>
+#include <windows.h>
+#include <ctime>
+#include <cstdlib>
+
+using namespace std;
+
+// Направления для змейки
+// 0 - вправо
+// 1 - вниз
+// 2- влево
+// 3 - вверх
+
+// Цвета для консоли Windows
+/*
+    Black = 0,
+    Blue = 1,
+    Green = 2,
+    Cyan = 3,
+    Red = 4,
+    Magenta = 5,
+    Yellow = 6,
+    White = 7
+*/
+
+// Установка цвета текста и фона
+void SetColor(string text, int background = 0) {
+    int color;
+    if (text == "Yellow") {
+        color = 6;
+    }
+    else if (text == "White") {
+        color = 7;
+    }
+    else if (text == "Green") {
+        color = 2;
+    }
+    else if (text == "Red") {
+        color = 4;
+    }
+    HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+    SetConsoleTextAttribute(hConsole, (WORD)((background << 4) | color));
+}
+
+class GameObject {
+protected:
+    int x, y;
+public:
+    GameObject(int x, int y) : x(x), y(y) {}
+    virtual ~GameObject() {}
+
+    int getX() { return x; }
+    int getY() { return y; }
+
+    virtual void draw() = 0;
+};
+
+class SnakeSegment : public GameObject {
+public:
+    SnakeSegment(int x, int y) : GameObject(x, y) {}
+
+    void draw() {
+        COORD pos = { x, y };
+        SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos);
+        cout << "O";
+    }
+};
+
+class Food : public GameObject {
+public:
+    Food(int x, int y) : GameObject(x, y) {}
+
+    void draw() {
+        COORD pos = { x, y };
+        SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos);
+        SetColor("Yellow");
+        cout << "@";
+        SetColor("White");
+    }
+};
+
+class Snake {
+private:
+    // вектор элемментов змейки
+    vector<SnakeSegment> segments;
+    // проверка на рост змеи
+    bool grow;
+public:
+    // направление змеи
+    int direction;
+
+    Snake(int startX, int startY) : grow(false), direction(2) {
+        segments.emplace_back(startX, startY);
+    }
+
+    void changeDirection(int newDirection) {
+        if ((direction == 3 && newDirection != 1) ||
+            (direction == 1 && newDirection != 3) ||
+            (direction == 2 && newDirection != 0) ||
+            (direction == 0 && newDirection != 2)) {
+            direction = newDirection;
+        }
+    }
+
+    void move() {
+        SnakeSegment head = segments.front();
+        int newX = head.getX();
+        int newY = head.getY();
+
+        switch (direction) {
+        case 3:    newY--; break;
+        case 1:  newY++; break;
+        case 2:  newX--; break;
+        case 0: newX++; break;
+        }
+
+        segments.insert(segments.begin(), SnakeSegment(newX, newY));
+
+        if (!grow) {
+            segments.pop_back();
+        }
+        else {
+            grow = false;
+        }
+    }
+
+    void growSnake() {
+        grow = true;
+    }
+    // проверка на то что врезалась в границы и в себя
+    bool checkCollision(int width, int height) {
+        SnakeSegment& head = segments.front();
+
+        if (head.getX() <= 0 || head.getX() >= width - 1 ||
+            head.getY() <= 0 || head.getY() >= height - 1) {
+            return true;
+        }
+
+        if (segments.size() > 3) {
+            for (auto it = segments.begin() + 1; it != segments.end(); ++it) {
+                if (it->getX() == head.getX() && it->getY() == head.getY()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+    // проверка что съел яблоко
+    bool checkFoodCollision(Food& food) {
+        SnakeSegment& head = segments.front();
+        return head.getX() == food.getX() && head.getY() == food.getY();
+    }
+
+    void draw() {
+        // отрисовка тела змейки (зеленый)
+        SetColor("Green");
+        for (auto it = segments.begin() + 1; it != segments.end(); ++it) {
+            it->draw();
+        }
+
+        // отрисовка головы змейки (красный)
+        SetColor("Red");
+        segments.front().draw();
+
+        // возвращаем белый цвет
+        SetColor("White");
+    }
+
+    vector<SnakeSegment>& getSegments() {
+        return segments;
+    }
+};
+
+class Game {
+private:
+    int width, height;
+    Snake snake;
+    Food food;
+    int score;
+    int need_score;
+    bool gameOver, win;
+
+    void clearScreen() {
+        system("cls");
+    }
+
+public:
+    Game(int w, int h, int count) : width(w), height(h), snake(w / 2, h / 2),
+        food(rand() % (w - 2) + 1, rand() % (h - 2) + 1), need_score(count),
+        score(0), gameOver(false), win(false) {
+        srand((unsigned int)time(nullptr));
+        clearScreen();
+        // скрываем курсор
+        HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
+        CONSOLE_CURSOR_INFO info;
+        info.dwSize = 100;
+        info.bVisible = FALSE;
+        SetConsoleCursorInfo(consoleHandle, &info);
+    }
+    // отрисовка границ
+    void drawBorder() {
+        SetColor("White");
+        for (int i = 0; i < width; i++) {
+            COORD pos1 = { i, 0 };
+            COORD pos2 = { i, (height - 1) };
+            SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos1);
+            cout << "#";
+            SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos2);
+            cout << "#";
+        }
+
+        for (int i = 0; i < height; i++) {
+            COORD pos1 = { 0, i };
+            COORD pos2 = { (width - 1), i };
+            SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos1);
+            cout << "#";
+            SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos2);
+            cout << "#";
+        }
+    }
+
+    void spawnFood() {
+        bool onSnake;
+        int newX, newY;
+
+        do {
+            onSnake = false;
+            newX = rand() % (width - 2) + 1;
+            newY = rand() % (height - 2) + 1;
+
+            for (auto& segment : snake.getSegments()) {
+                if (segment.getX() == newX && segment.getY() == newY) {
+                    onSnake = true;
+                    break;
+                }
+            }
+        } while (onSnake);
+
+        food = Food(newX, newY);
+    }
+    // проверка на окончание игры и обновление данных
+    void update() {
+        if (gameOver) return;
+        if (win) return;
+
+        snake.move();
+
+        if (snake.checkCollision(width, height)) {
+            gameOver = true;
+            return;
+        }
+
+        if (snake.checkFoodCollision(food)) {
+            snake.growSnake();
+            score += 10;
+            if (score >= need_score) {
+                win = true;
+            }
+            spawnFood();
+        }
+    }
+    // отрисовка всего поля и меню
+    void draw() {
+        clearScreen();
+        drawBorder();
+
+        snake.draw();
+        food.draw();
+
+        COORD scorePos = { 0, height };
+        SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), scorePos);
+        cout << "Score: " << score;
+
+        if (win) {
+            COORD winPos = { (width / 2 - 5), (height / 2) };
+            SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), winPos);
+            cout << "Win!";
+        }
+
+        if (gameOver) {
+            COORD gameOverPos = { (width / 2 - 5), (height / 2) };
+            SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), gameOverPos);
+            cout << "GAME OVER!";
+
+            COORD scorePos = { (width / 2 - 8), (height / 2 + 1) };
+            SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), scorePos);
+            cout << "Final score: " << score;
+        }
+    }
+    // параллельный ввод кнопок и стрелок
+    void input() {
+        if (_kbhit()) {
+            int key = _getch();
+
+            // Обычные клавиши
+            switch (key) {
+            case 'w': case 'W': snake.changeDirection(3); break;
+            case 's': case 'S': snake.changeDirection(1); break;
+            case 'a': case 'A': snake.changeDirection(2); break;
+            case 'd': case 'D': snake.changeDirection(0); break;
+            case 'x': case 'X': gameOver = true; break;
+            }
+
+            // Стрелки 
+            if (key == 0 || key == 224) {
+                switch (_getch()) {
+                case 72: snake.changeDirection(3); break;    // Вверх
+                case 80: snake.changeDirection(1); break;  // Вниз
+                case 75: snake.changeDirection(2); break;  // Влево
+                case 77: snake.changeDirection(0); break; // Вправо
+                }
+            }
+        }
+    }
+
+    bool isGameOver() {
+        return gameOver;
+    }
+
+    bool isWin() {
+        return win;
+    }
+    // игровой процесс
+    void run() {
+        while (!isGameOver() && !isWin()) {
+            input();
+            update();
+            draw();
+            Sleep(100); // задержка 100 мс
+        }
+
+        // ждем нажатия любой клавиши перед выходом
+        _getch();
+    }
+};
+
+int main() {
+    setlocale(LC_ALL, "Russian");
+    int count_win;
+    cout << "Сколько нужно очков для победы: ";
+    cin >> count_win;
+    Game game(40, 20, count_win);
+    game.run();
+    return 0;
+}
